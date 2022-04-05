@@ -6,7 +6,7 @@ from resources.routes import api_router
 
 origins = [
     "http://localhost",
-    "http://localhost:8000"
+    "http://localhost:4300"
 ]
 
 
