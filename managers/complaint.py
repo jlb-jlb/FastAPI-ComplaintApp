@@ -53,38 +53,58 @@ class ComplaintManager:
 
     @staticmethod
     async def approve(id_):
-        await database.execute(
-            complaint.update()
-            .where(complaint.c.id == id_)
-            .values(status=State.approved)
-        )
-        # fetch Transaction Data from Database
-        transaction_data = await database.fetch_one(
-            transaction.select().where(transaction.c.complaint_id == id_)
-        )
-        wise.fund_transfer(transaction_data["transfer_id"])
-        ses.send_mail(
-            "Complaint approved!",  # title
-            ["joscha.bisping@gmail.com"],  # for now hardcoded # recipient
-            "Congrats your claim is approved. Check your bank account in 2 days",  # Body
-        )
+        """Approves the complaint. The whole process should be fully executed or not"""
+        async with database.transaction() as tconn:  # make transaction full
+            await tconn._connection.execute(complaint.update().where(complaint.c.id == id_).values(status=State.approved))
+            """
+            await database.execute(
+                complaint.update()
+                .where(complaint.c.id == id_)
+                .values(status=State.approved)
+            )
+            """
+            # fetch Transaction Data from Database
+            transaction_data = await tconn._connection.fetch_one(transaction.select().where(transaction.c.complaint_id == id_))
+            """
+            transaction_data = await database.fetch_one(
+                transaction.select().where(transaction.c.complaint_id == id_)
+            )
+            """
+            wise.fund_transfer(transaction_data["transfer_id"])
+            ses.send_mail(
+                "Complaint approved!",  # title
+                ["joscha.bisping@gmail.com"],  # for now hardcoded # recipient
+                "Congrats your claim is approved. Check your bank account in 2 days",  # Body
+            )
 
     @staticmethod
     async def reject(id_):
-        transaction_data = await database.fetch_one(
-            transaction.select().where(transaction.c.complaint_id == id_)
-        )
-        wise.cancel_funds(transaction_data["transfer_id"])
-        await database.execute(
-            complaint.update()
-            .where(complaint.c.id == id_)
-            .values(status=State.rejected)
-        )
-        ses.send_mail(
-            "Complaint rejected!",  # title
-            ["joscha.bisping@gmail.com"],  # for now hardcoded # recipient
-            "Unfortunately we we cannot approve your complaint.",  # Body
-        )
+        async with database.transaction() as tconn:
+            transaction_data = await tconn._connection.fetch_one(
+                transaction.select().where(transaction.c.complaint_id == id_)
+            )
+            """
+            transaction_data = await database.fetch_one(
+                transaction.select().where(transaction.c.complaint_id == id_)
+            )
+            """
+
+            wise.cancel_funds(transaction_data["transfer_id"])
+            await tconn._connection.execute(
+                complaint.update().where(complaint.c.id == id_).values(status=State.rejected)
+            )
+            """
+            await database.execute(
+                complaint.update()
+                .where(complaint.c.id == id_)
+                .values(status=State.rejected)
+            )
+            """
+            ses.send_mail(
+                "Complaint rejected!",  # title
+                ["joscha.bisping@gmail.com"],  # for now hardcoded # recipient
+                "Unfortunately we we cannot approve your complaint.",  # Body
+            )
 
     @staticmethod
     async def issue_transaction(tconn, amount, full_name, iban, complaint_id):
