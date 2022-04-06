@@ -31,7 +31,7 @@ class WiseService:
             "targetCurrency": "EUR",
             # "sourceAmount": 100,
             "targetAmount": amount,
-            "profile": self.profile_id
+            "profile": self.profile_id,
         }
         resp = requests.post(url, headers=self.headers, data=json.dumps(data))
         return self._check_status_id(resp)
@@ -39,21 +39,21 @@ class WiseService:
     def create_recipient_account(self, full_name, iban):
         url = config("WISE_API_POST_ACCOUNTS")
         data = {
-                "currency": "EUR",
-                "type": "iban",
-                "profile": self.profile_id,
-                "accountHolderName": full_name,
-                "legalType": "PRIVATE",
-                "details": {
-                    "iban": iban,
-                }
+            "currency": "EUR",
+            "type": "iban",
+            "profile": self.profile_id,
+            "accountHolderName": full_name,
+            "legalType": "PRIVATE",
+            "details": {
+                "iban": iban,
+            },
         }
         resp = requests.post(url, headers=self.headers, data=json.dumps(data))
         return self._check_status_id(resp)
 
     def create_transfer(self, target_account_id, quote_id):
         url = config("WISE_API_POST_TRANSFERS")
-        customer_transaction_id = str(uuid.uuid1())  # use 4
+        customer_transaction_id = str(uuid.uuid4())  # use 4
         data = {
             "targetAccount": target_account_id,
             "quoteUuid": quote_id,
@@ -61,19 +61,26 @@ class WiseService:
             "details": {
                 "reference": "customer refund",
                 "transferPurpose": "verification.transfers.purpose.pay.bills",
-                "sourceOfFunds": "verification.source.of.funds.other"
+                "sourceOfFunds": "verification.source.of.funds.other",
             },
         }
         resp = requests.post(url, headers=self.headers, data=json.dumps(data))
         return self._check_status_id(resp)
 
     def fund_transfer(self, transfer_id):
-        url = self.main_url + f"/v3/profiles/{self.profile_id}/transfers/{transfer_id}/payments"
-        data = {
-            "type": "BALANCE"
-        }
+        url = (
+            self.main_url
+            + f"/v3/profiles/{self.profile_id}/transfers/{transfer_id}/payments"
+        )
+        data = {"type": "BALANCE"}
         resp = requests.post(url, headers=self.headers, data=json.dumps(data))
         return self._check_status_id(resp, code=201, ident="balanceTransactionId")
+
+    def cancel_funds(self, transfer_id):
+        """Cancels the transfer from a specified transfer_id"""
+        url = self.main_url + f"/v1/transfers/{transfer_id}/cancel"
+        resp = requests.put(url, headers=self.headers)
+        return self._check_status_id(resp)
 
     @staticmethod
     def _check_status(resp, code=200):
@@ -91,13 +98,17 @@ class WiseService:
             resp = resp.json()
             return resp[ident]
         print(resp)
-        raise HTTPException(status_code=500, detail="Payment provider is not available at the moment")
+        raise HTTPException(
+            status_code=500, detail="Payment provider is not available at the moment"
+        )
 
 
 if __name__ == "__main__":
     wise = WiseService()
     quote_idx = wise.create_quote(10.11)
-    recipient_id = wise.create_recipient_account("Joscha Xylophon", "DE89370400440532013000")
+    recipient_id = wise.create_recipient_account(
+        "Joscha Bisping", "DE89370400440532013000"
+    )
     transfer_id = wise.create_transfer(recipient_id, quote_idx)
     res = wise.fund_transfer(transfer_id)
     a = 5

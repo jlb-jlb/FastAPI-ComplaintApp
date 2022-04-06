@@ -12,28 +12,17 @@ class SESService:
             service_name="ses",
             aws_access_key_id=self.key,
             aws_secret_access_key=self.secret,
-            region_name=self.region
+            region_name=self.region,
         )
 
     def send_mail(self, subject, to_addresses, text_data):
-        body = {
-            "Text": {
-                "Data": text_data,
-                "Charset": "UTF-8"
-            }
-        }
+        body = {"Text": {"Data": text_data, "Charset": "UTF-8"}}
         self.ses.send_email(
             Source="no-reply@competwatch.com",
             Destination={
                 "ToAddresses": to_addresses,
                 "CcAddresses": [],
                 "BccAddresses": [],
-                },
-            Message={
-                "Subject": {
-                    "Data": subject,
-                    "Charset": "UTF-8"
-                },
-                "Body": body
             },
+            Message={"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": body},
         )
